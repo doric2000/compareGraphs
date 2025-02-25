@@ -1,17 +1,22 @@
+import matplotlib
 import pyshark
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import numpy as np
 
+# 📍 השתמש בממשק התצוגה TkAgg
+matplotlib.use('TkAgg')
+
 # 📂 נתיב לקבצים
 pcap_folder = './pcapfiles/'
 
-# שמירת התוצאות
+# 🔒 שמירת התוצאות
 results = {}
 
 # 🎨 צבעים ייחודיים לכל אפליקציה
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+
 
 # 🔍 פונקציה לניתוח קובץ PCAP
 def analyze_pcap(file_path):
@@ -86,12 +91,14 @@ def analyze_pcap(file_path):
         })
     }
 
+
 # 🔍 עיבוד כל הקבצים בתיקיה
 for idx, file in enumerate(os.listdir(pcap_folder)):
     if file.endswith('.pcap') or file.endswith('.pcapng'):
         app_name = file.split('.')[0]
         file_path = os.path.join(pcap_folder, file)
         results[app_name] = analyze_pcap(file_path)
+
 
 # ✅ פונקציה לציור גרף עם תיאור מילולי
 def plot_with_description(title, xlabel, ylabel, data, feature_name):
@@ -121,19 +128,23 @@ def plot_with_description(title, xlabel, ylabel, data, feature_name):
         count = feature_counts.max()
         descriptions.append(f"- **{app}**: Most frequent {feature_name} is '{most_common}' with {count} occurrences.")
 
+        # תוויות על העמודות (מיקום נכון)
+        for i, count in enumerate(feature_counts):
+            if count > 0:
+                plt.text(positions[i], count + 0.1, str(count), ha='center', va='bottom', fontsize=8)
+
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.xticks(x + bar_width * (n_apps / 2), categories, rotation=45)
+    plt.xticks(x + bar_width * (n_apps / 2), categories, rotation=0)
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.6)
 
-    # תוויות ערכים
-    for idx, (app, app_data) in enumerate(results.items()):
-        feature_counts = app_data[data][feature_name].value_counts().reindex(categories, fill_value=0)
-        positions = x + (idx * bar_width)
-        for i, count in enumerate(feature_counts):
-            plt.text(positions[i], count + 5, str(count), ha='center', va='bottom', fontsize=8)
+    # הגבלת ציר Y
+    max_count = max(
+        app_data[data][feature_name].value_counts().max() for app_data in results.values()
+    )
+    plt.ylim(0, max_count + 2)
 
     plt.tight_layout()
     plt.show()
@@ -144,34 +155,127 @@ def plot_with_description(title, xlabel, ylabel, data, feature_name):
         print(description)
     print("\n")
 
+
 # ✅ A. IP Header Fields
 plot_with_description("A: IP Protocol Distribution by App", "Protocol", "Count", "ip", "Protocol")
 
-# ✅ B. TCP Source Ports
-plot_with_description("B: TCP Source Ports Distribution by App", "Source Port", "Count", "tcp", "Source Port")
 
-# ✅ C. TLS Handshake Types
+# ✅ B. TCP Source Ports - Top 10 Ports Bar Chart
+def plot_top_ports(title, xlabel, ylabel, data, feature_name):
+    plt.figure(figsize=(16, 8))
+    descriptions = []
+
+    # מציאת 10 הפורטים הכי נפוצים
+    all_ports = pd.Series(dtype=int)
+    for app_data in results.values():
+        ports = app_data[data][feature_name].dropna().astype(int)
+        all_ports = pd.concat([all_ports, ports])
+
+    top_ports = all_ports.value_counts().head(10).index.tolist()
+
+    n_ports = len(top_ports)
+    n_apps = len(results)
+    bar_width = 0.15
+    x = np.arange(n_ports)
+
+    for idx, (app, app_data) in enumerate(results.items()):
+        ports = app_data[data][feature_name].dropna().astype(int)
+        port_counts = ports.value_counts().reindex(top_ports, fill_value=0)
+        positions = x + (idx * bar_width)
+        plt.bar(
+            positions,
+            port_counts,
+            width=bar_width,
+            color=colors[idx % len(colors)],
+            label=app
+        )
+
+        # תיאור מילולי
+        most_common = port_counts.idxmax()
+        count = port_counts.max()
+        descriptions.append(f"- **{app}**: Most frequent port is '{most_common}' with {count} occurrences.")
+
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.xticks(x + bar_width * (n_apps / 2), [str(port) for port in top_ports], rotation=45)
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.6)
+
+    # תוויות ערכים
+    for idx, (app, app_data) in enumerate(results.items()):
+        ports = app_data[data][feature_name].dropna().astype(int)
+        port_counts = ports.value_counts().reindex(top_ports, fill_value=0)
+        positions = x + (idx * bar_width)
+        for i, count in enumerate(port_counts):
+            if count > 0:
+                plt.text(positions[i], count + 5, str(count), ha='center', va='bottom', fontsize=8)
+
+    plt.tight_layout()
+    plt.show()
+
+    # תיאור מילולי
+    print(f"### {title} - Description:")
+    for description in descriptions:
+        print(description)
+    print("\n")
+
+
+# גרף B עם תיקון - הצגת 10 הפורטים הנפוצים ביותר
+plot_top_ports("B: Top 10 TCP Source Ports by App", "Source Port", "Count", "tcp", "Source Port")
+
+
+# ✅ C. TLS Handshake Types with Fixed Label Positions
 plot_with_description("C: TLS Handshake Types by App", "Handshake Type", "Count", "tls", "Handshake Type")
 
-# ✅ D. Packet Sizes
-# פיזור גודל החבילות (Histogram)
-plt.figure(figsize=(14, 7))
+
+# ✅ D. Packet Size Distribution - Grouped Bar Chart with Improved Labels
+max_packet_size = 5000  # גודל פקטה מקסימלי
+bins = np.arange(0, max_packet_size, 200)  # טווחים של 200 bytes
+bar_width = 0.2
+n_apps = len(results)
+x = np.arange(len(bins) - 1)
+
+# יצירת הגרף
+plt.figure(figsize=(18, 8))
 descriptions = []
 
 for idx, (app, app_data) in enumerate(results.items()):
-    if not app_data['ip']['Packet Size'].empty:
-        packet_sizes = app_data['ip']['Packet Size'].dropna()
-        plt.hist(packet_sizes, bins=50, alpha=0.5, color=colors[idx % len(colors)], label=app)
+    packet_sizes = app_data['ip']['Packet Size'].dropna()
+    packet_sizes = packet_sizes[packet_sizes <= max_packet_size]  # סינון פקטות חריגות
+    counts, _ = np.histogram(packet_sizes, bins)
 
-        # תיאור מילולי
-        avg_size = packet_sizes.mean()
-        descriptions.append(f"- **{app}**: Average packet size is {avg_size:.2f} bytes.")
+    positions = x + (idx * bar_width)
+    plt.bar(
+        positions,
+        counts,
+        width=bar_width,
+        color=colors[idx % len(colors)],
+        label=app
+    )
 
-plt.title("D: Packet Size Distribution by App")
+    # תיאור מילולי
+    avg_size = packet_sizes.mean() if len(packet_sizes) > 0 else 0
+    descriptions.append(f"- **{app}**: Average packet size is {avg_size:.2f} bytes.")
+
+# תוויות ופרטים
+plt.title("D: Packet Size Distribution by App (Grouped Bar Chart)")
 plt.xlabel("Packet Size (Bytes)")
 plt.ylabel("Frequency")
+plt.xticks(x + bar_width * (n_apps / 2), [f"{int(b)}-{int(b + 200)}" for b in bins[:-1]], rotation=45)
 plt.legend()
 plt.grid(True, linestyle='--', alpha=0.6)
+
+# הצגת הערכים מעל כל עמודה בצורה מסודרת
+for idx, (app, app_data) in enumerate(results.items()):
+    packet_sizes = app_data['ip']['Packet Size'].dropna()
+    packet_sizes = packet_sizes[packet_sizes <= max_packet_size]
+    counts, _ = np.histogram(packet_sizes, bins)
+    positions = x + (idx * bar_width)
+    for i, count in enumerate(counts):
+        if count > 0:
+            plt.text(positions[i], count + (0.02 * max(counts)), str(count), ha='center', va='bottom', fontsize=7)
+
 plt.tight_layout()
 plt.show()
 
