@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import numpy as np
+from matplotlib.ticker import ScalarFormatter
 
 matplotlib.use('TkAgg')
 
@@ -123,7 +124,7 @@ def plot_ip_protocol_distribution():
             plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), str(int(bar.get_height())), ha='center',
                      va='bottom', fontsize=8)
 
-    plt.title("A: Most Frequent Protocols by App (Including UDP)")
+    plt.title("A: Most Frequent Protocols by App")
     plt.xlabel("Protocol")
     plt.ylabel("Count")
     plt.xticks(x + bar_width * (len(results) / 2), top_protocols, rotation=45)
@@ -158,7 +159,7 @@ def plot_tcp_source_ports():
                 plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 5,
                          str(int(bar.get_height())), ha='center', va='bottom', fontsize=9, rotation=45)
 
-    plt.title("B: Top 10 TCP Source Ports by App (Improved)")
+    plt.title("B: Top 10 TCP Source Ports by App")
     plt.xlabel("Source Port")
     plt.ylabel("Count")
     plt.xticks(x + bar_width * (len(results) / 2), unique_ports, rotation=45, ha="right")
@@ -169,9 +170,12 @@ def plot_tcp_source_ports():
 
 
 # ✅ C. Packet Inter-arrival Time
+from matplotlib.ticker import MaxNLocator
+
+
 def plot_packet_inter_arrival():
     num_apps = len(results)
-    cols = 2  # מספר העמודות של הסאבפלוטים
+    cols = 2
     rows = (num_apps // cols) + (num_apps % cols > 0)
 
     fig, axes = plt.subplots(rows, cols, figsize=(16, 10))
@@ -191,31 +195,32 @@ def plot_packet_inter_arrival():
                 label=app
             )
 
-            # חישוב ממוצע מרווח הזמן בין חבילות
+            # חישוב ממוצע והוספתו
             avg_interval = intervals.mean() * 1000  # ms
             ax.axvline(avg_interval / 1000, color='black', linestyle='--', linewidth=2)
-            ax.text(avg_interval / 1000, ax.get_ylim()[1] * 0.8, f"Avg: {avg_interval:.2f} ms",
-                    rotation=90, va='center', ha='right', fontsize=10, fontweight='bold', color='black',
-                    bbox=dict(facecolor='white', alpha=0.6))
 
-            ax.set_xscale('log')
+            # ✨ מיקום חדש לתווית מעל הגרף
+            y_max = ax.get_ylim()[1] * 1.05  # קביעת מיקום מעל הגרף
+            ax.text(avg_interval / 1000, y_max, f"Avg: {avg_interval:.2f} ms",
+                    ha='center', va='bottom', fontsize=10, fontweight='bold', color='black',
+                    bbox=dict(facecolor='white', alpha=0.8, edgecolor='black'))
+
             ax.set_title(f"Packet Inter-arrival Time: {app}")
             ax.set_xlabel("Inter-arrival Time (s)")
             ax.set_ylabel("Density")
             ax.grid(True, linestyle='--', alpha=0.6, which='both')
 
-    # הסתרת גרפים ריקים אם יש צורך
     for i in range(idx + 1, len(axes)):
         fig.delaxes(axes[i])
 
-    plt.tight_layout(rect=[0, 0, 1, 0.96])  # התאמת הגרפים כדי לא לפגוע בכותרת העליונה
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
 
 # ✅ D. Packet Sizes
 def plot_packet_size_distribution():
     num_apps = len(results)
-    cols = 2  # מספר העמודות של הסאבפלוטים
+    cols = 2
     rows = (num_apps // cols) + (num_apps % cols > 0)
 
     fig, axes = plt.subplots(rows, cols, figsize=(16, 10))
@@ -226,25 +231,27 @@ def plot_packet_size_distribution():
         ax = axes[idx]
         if not app_data['ip']['Packet Size'].empty:
             packet_sizes = app_data['ip']['Packet Size'].dropna()
-            ax.hist(packet_sizes, bins=50, alpha=0.7, color=colors[idx % len(colors)], edgecolor='black')
+            ax.hist(packet_sizes, bins=50, alpha=0.6, color=colors[idx % len(colors)], edgecolor='black')
 
-            # חישוב ממוצע גודל החבילות
+            # חישוב ממוצע והוספתו
             avg_size = packet_sizes.mean()
             ax.axvline(avg_size, color='black', linestyle='--', linewidth=2)
-            ax.text(avg_size, ax.get_ylim()[1] * 0.8, f"Avg: {avg_size:.2f} bytes", rotation=90,
-                    va='center', ha='right', fontsize=10, fontweight='bold', color='black', bbox=dict(facecolor='white', alpha=0.6))
 
-            ax.set_xscale('log')
+            # ✨ מיקום חדש לתווית הממוצע מעל הגרף
+            y_max = ax.get_ylim()[1] * 1.05  # קביעת מיקום מעל הגרף
+            ax.text(avg_size, y_max, f"Avg: {avg_size:.2f} Bytes",
+                    ha='center', va='bottom', fontsize=10, fontweight='bold', color='black',
+                    bbox=dict(facecolor='white', alpha=0.8, edgecolor='black'))
+
             ax.set_title(f"Packet Size Distribution: {app}")
             ax.set_xlabel("Packet Size (Bytes)")
             ax.set_ylabel("Frequency")
             ax.grid(True, linestyle='--', alpha=0.6, which='both')
 
-    # הסתרת גרפים ריקים אם יש צורך
     for i in range(idx + 1, len(axes)):
         fig.delaxes(axes[i])
 
-    plt.tight_layout(rect=[0, 0, 1, 0.96])  # התאמת הגרפים כדי לא לפגוע בכותרת העליונה
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
 
