@@ -25,6 +25,7 @@ def analyze_pcap(file_path):
     ip_src = []
     ip_dst = []
     protocols = []
+    transport_protocols = []
     packet_sizes = []
     packet_timestamps = []
 
@@ -38,12 +39,14 @@ def analyze_pcap(file_path):
             ip_src.append(packet.ip.src)
             ip_dst.append(packet.ip.dst)
             protocols.append(packet.highest_layer)
+            transport_protocols.append(packet.transport_layer)
             packet_sizes.append(int(packet.length))
             packet_timestamps.append(float(packet.sniff_timestamp))
         else:
             ip_src.append(None)
             ip_dst.append(None)
             protocols.append(None)
+            transport_protocols.append(None)
             packet_sizes.append(None)
             packet_timestamps.append(None)
 
@@ -67,6 +70,7 @@ def analyze_pcap(file_path):
             'Source IP': ip_src,
             'Destination IP': ip_dst,
             'Protocol': protocols,
+            'Transport': transport_protocols,
             'Packet Size': packet_sizes,
             'Timestamp': packet_timestamps
         }),
@@ -89,39 +93,47 @@ for idx, file in enumerate(os.listdir(pcap_folder)):
         results[app_name] = analyze_pcap(file_path)
 
 
-# ✅ A. IP Header Fields
+# ✅ A. IP Header Fields - כולל פרוטוקולים של UDP
 def plot_ip_protocol_distribution():
     plt.figure(figsize=(14, 7))
-    categories = list(set(
-        protocol
-        for app_data in results.values()
-        for protocol in app_data['ip']['Protocol'].dropna().unique()
-    ))
-    categories.sort()
+    protocol_counts = {}
 
-    x = np.arange(len(categories))
+    for app, app_data in results.items():
+        protocol_count = app_data['ip']['Protocol'].value_counts()
+        transport_count = app_data['ip']['Transport'].value_counts()
+
+        for protocol, count in protocol_count.items():
+            protocol_counts[protocol] = protocol_counts.get(protocol, 0) + count
+        for transport, count in transport_count.items():
+            protocol_counts[transport] = protocol_counts.get(transport, 0) + count
+
+    top_protocols = sorted(protocol_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    top_protocols = [p[0] for p in top_protocols]
+
     bar_width = 0.15
+    x = np.arange(len(top_protocols))
 
     for idx, (app, app_data) in enumerate(results.items()):
-        counts = app_data['ip']['Protocol'].value_counts().reindex(categories, fill_value=0)
-        plt.bar(x + idx * bar_width, counts, width=bar_width, color=colors[idx % len(colors)], label=app)
+        filtered_data = app_data['ip']['Protocol'].value_counts().reindex(top_protocols, fill_value=0)
+        transport_data = app_data['ip']['Transport'].value_counts().reindex(top_protocols, fill_value=0)
+        final_data = filtered_data.add(transport_data, fill_value=0)
+        bars = plt.bar(x + idx * bar_width, final_data, width=bar_width, label=app, alpha=0.8)
 
-        # הצגת ספירות
-        for i, count in enumerate(counts):
-            plt.text(x[i] + idx * bar_width, count + 5, str(count), ha='center', va='bottom', fontsize=8)
+        for bar in bars:
+            plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), str(int(bar.get_height())), ha='center',
+                     va='bottom', fontsize=8)
 
-    plt.title("A: IP Protocol Distribution by App")
+    plt.title("A: Most Frequent Protocols by App (Including UDP)")
     plt.xlabel("Protocol")
     plt.ylabel("Count")
-    plt.xticks(x + bar_width * (len(results) / 2), categories, rotation=45)
+    plt.xticks(x + bar_width * (len(results) / 2), top_protocols, rotation=45)
     plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.tight_layout()
+    plt.grid(axis="y", linestyle="--", alpha=0.6)
     plt.show()
 
 
-# ✅ B. Top 10 TCP Source Ports - תיקון
-def plot_tcp_source_ports_fixed():
+# ✅ B. Top 10 TCP Source Ports
+def plot_tcp_source_ports():
     plt.figure(figsize=(18, 9))
     port_counts = {}
 
@@ -138,30 +150,32 @@ def plot_tcp_source_ports_fixed():
 
     for idx, (app, counts) in enumerate(port_counts.items()):
         values = [counts.get(port, 0) for port in unique_ports]
-        plt.bar(x + idx * bar_width, values, width=bar_width, color=colors[idx % len(colors)], label=app)
+        bars = plt.bar(x + idx * bar_width, values, width=bar_width, color=colors[idx % len(colors)], label=app)
 
-        # הצגת המספרים על גבי העמודות
-        for i, count in enumerate(values):
-            if count > 0:
-                plt.text(x[i] + idx * bar_width, count + 2, str(count), ha='center', va='bottom', fontsize=8)
+        # הצגת המספרים על גבי העמודות עם הטייה כלפי מעלה
+        for bar in bars:
+            if bar.get_height() > 0:
+                plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 5,
+                         str(int(bar.get_height())), ha='center', va='bottom', fontsize=9, rotation=45)
 
-    plt.title("B: Top 10 TCP Source Ports by App (Fixed)")
+    plt.title("B: Top 10 TCP Source Ports by App (Improved)")
     plt.xlabel("Source Port")
     plt.ylabel("Count")
-    plt.xticks(x + bar_width * (len(results) / 2), unique_ports, rotation=45)
+    plt.xticks(x + bar_width * (len(results) / 2), unique_ports, rotation=45, ha="right")
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.tight_layout()
     plt.show()
 
 
-# ✅ C. Packet Inter-arrival Time - שיפור התצוגה עם KDE ו-Subplots
-def plot_packet_inter_arrival_improved():
+# ✅ C. Packet Inter-arrival Time
+def plot_packet_inter_arrival():
     num_apps = len(results)
     cols = 2  # מספר העמודות של הסאבפלוטים
     rows = (num_apps // cols) + (num_apps % cols > 0)
 
     fig, axes = plt.subplots(rows, cols, figsize=(16, 10))
+    fig.suptitle("C: Packet Inter-arrival Time Distribution by App", fontsize=16, fontweight='bold')
     axes = axes.flatten()
 
     for idx, (app, app_data) in enumerate(results.items()):
@@ -177,10 +191,12 @@ def plot_packet_inter_arrival_improved():
                 label=app
             )
 
-            # חישוב ממוצע והצגתו
+            # חישוב ממוצע מרווח הזמן בין חבילות
             avg_interval = intervals.mean() * 1000  # ms
-            ax.axvline(avg_interval / 1000, color='black', linestyle='--', linewidth=1)
-            ax.text(avg_interval / 1000, 0.8, f"Avg: {avg_interval:.2f} ms", rotation=90, va='center', fontsize=9)
+            ax.axvline(avg_interval / 1000, color='black', linestyle='--', linewidth=2)
+            ax.text(avg_interval / 1000, ax.get_ylim()[1] * 0.8, f"Avg: {avg_interval:.2f} ms",
+                    rotation=90, va='center', ha='right', fontsize=10, fontweight='bold', color='black',
+                    bbox=dict(facecolor='white', alpha=0.6))
 
             ax.set_xscale('log')
             ax.set_title(f"Packet Inter-arrival Time: {app}")
@@ -188,45 +204,52 @@ def plot_packet_inter_arrival_improved():
             ax.set_ylabel("Density")
             ax.grid(True, linestyle='--', alpha=0.6, which='both')
 
-    # הסתרת גרפים ריקים במידת הצורך
+    # הסתרת גרפים ריקים אם יש צורך
     for i in range(idx + 1, len(axes)):
         fig.delaxes(axes[i])
 
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # התאמת הגרפים כדי לא לפגוע בכותרת העליונה
     plt.show()
 
 
 # ✅ D. Packet Sizes
 def plot_packet_size_distribution():
-    plt.figure(figsize=(14, 7))
-    descriptions = []
+    num_apps = len(results)
+    cols = 2  # מספר העמודות של הסאבפלוטים
+    rows = (num_apps // cols) + (num_apps % cols > 0)
+
+    fig, axes = plt.subplots(rows, cols, figsize=(16, 10))
+    fig.suptitle("D: Packet Size Distribution by App", fontsize=16, fontweight='bold')
+    axes = axes.flatten()
 
     for idx, (app, app_data) in enumerate(results.items()):
+        ax = axes[idx]
         if not app_data['ip']['Packet Size'].empty:
             packet_sizes = app_data['ip']['Packet Size'].dropna()
-            plt.hist(packet_sizes, bins=50, alpha=0.5, color=colors[idx % len(colors)], label=app)
+            ax.hist(packet_sizes, bins=50, alpha=0.7, color=colors[idx % len(colors)], edgecolor='black')
 
-            # ממוצע גודל החבילות
+            # חישוב ממוצע גודל החבילות
             avg_size = packet_sizes.mean()
-            descriptions.append(f"- **{app}**: Average packet size is {avg_size:.2f} bytes.")
+            ax.axvline(avg_size, color='black', linestyle='--', linewidth=2)
+            ax.text(avg_size, ax.get_ylim()[1] * 0.8, f"Avg: {avg_size:.2f} bytes", rotation=90,
+                    va='center', ha='right', fontsize=10, fontweight='bold', color='black', bbox=dict(facecolor='white', alpha=0.6))
 
-    plt.title("D: Packet Size Distribution by App")
-    plt.xlabel("Packet Size (Bytes)")
-    plt.ylabel("Frequency")
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.tight_layout()
+            ax.set_xscale('log')
+            ax.set_title(f"Packet Size Distribution: {app}")
+            ax.set_xlabel("Packet Size (Bytes)")
+            ax.set_ylabel("Frequency")
+            ax.grid(True, linestyle='--', alpha=0.6, which='both')
+
+    # הסתרת גרפים ריקים אם יש צורך
+    for i in range(idx + 1, len(axes)):
+        fig.delaxes(axes[i])
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # התאמת הגרפים כדי לא לפגוע בכותרת העליונה
     plt.show()
 
-    # הדפסת התיאורים
-    print("### D: Packet Size Description:")
-    for description in descriptions:
-        print(description)
-    print("\n")
 
-
-# 📊 הרצת הגרפים המתוקנים
+# 📊 הפעלת כל הגרפים
 plot_ip_protocol_distribution()
-plot_tcp_source_ports_fixed()
-plot_packet_inter_arrival_improved()
+plot_tcp_source_ports()
+plot_packet_inter_arrival()
 plot_packet_size_distribution()
