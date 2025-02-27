@@ -11,6 +11,7 @@ matplotlib.use('TkAgg')
 
 # 📂 נתיב לקבצים
 pcap_folder = './pcapfiles/'
+ssl_keys_folder = './sslkeys/'  # 🔑 תיקייה לקובצי SSL Key Log
 
 # שמירת התוצאות
 results = {}
@@ -18,10 +19,26 @@ results = {}
 # 🎨 צבעים ייחודיים לכל אפליקציה
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
 
+# 🔍 פונקציה לניתוח קובץ PCAP עם קובץ SSL
 
-# 🔍 פונקציה לניתוח קובץ PCAP
-def analyze_pcap(file_path):
-    cap = pyshark.FileCapture(file_path)
+for idx, file in enumerate(os.listdir(pcap_folder)):
+    if file.endswith('.pcap') or file.endswith('.pcapng'):
+        app_name = file.split('.')[0]
+        file_path = os.path.join(pcap_folder, file)
+        ssl_key_file = os.path.join(ssl_keys_folder, f"{app_name}.log")
+
+        if os.path.exists(ssl_key_file):
+            print(f"✅ Using SSL Key Log: {ssl_key_file} for {app_name}")
+        else:
+            print(f"⚠️ No SSL Key Log found for {app_name}, running without decryption.")
+
+
+def analyze_pcap(file_path, ssl_key_path=None):
+    capture_options = {}
+    if ssl_key_path and os.path.exists(ssl_key_path):
+        capture_options['override_prefs'] = {'tls.keylog_file': ssl_key_path}
+
+    cap = pyshark.FileCapture(file_path, **capture_options)
 
     ip_src = []
     ip_dst = []
@@ -33,6 +50,11 @@ def analyze_pcap(file_path):
     tcp_src_ports = []
     tcp_dst_ports = []
     tcp_flags = []
+
+    tls_versions = []
+    tls_cipher_suites = []
+    tls_handshake_types = []
+    tls_sni = []
 
     for packet in cap:
         # A. IP Header Fields
@@ -61,6 +83,18 @@ def analyze_pcap(file_path):
             tcp_dst_ports.append(None)
             tcp_flags.append(None)
 
+        # C. TLS Fields
+        if 'tls' in packet:
+            tls_handshake_types.append(getattr(packet.tls, 'handshake_type', None))
+            tls_versions.append(getattr(packet.tls, 'record_version', None))
+            tls_cipher_suites.append(getattr(packet.tls, 'handshake_ciphersuite', None))
+            tls_sni.append(getattr(packet.tls, 'handshake_extensions_server_name', None))
+        else:
+            tls_handshake_types.append(None)
+            tls_versions.append(None)
+            tls_cipher_suites.append(None)
+            tls_sni.append(None)
+
     cap.close()
 
     # חישוב מרווחי זמן בין פקטות
@@ -80,18 +114,24 @@ def analyze_pcap(file_path):
             'Destination Port': tcp_dst_ports,
             'TCP Flags': tcp_flags
         }),
+        'tls': pd.DataFrame({
+            'TLS Version': tls_versions,
+            'TLS Cipher Suite': tls_cipher_suites,
+            'TLS Handshake Type': tls_handshake_types,
+            'Server Name (SNI)': tls_sni
+        }),
         'inter_arrival': pd.DataFrame({
             'Interval': packet_intervals
         })
     }
-
 
 # 🔍 עיבוד כל הקבצים בתיקיה
 for idx, file in enumerate(os.listdir(pcap_folder)):
     if file.endswith('.pcap') or file.endswith('.pcapng'):
         app_name = file.split('.')[0]
         file_path = os.path.join(pcap_folder, file)
-        results[app_name] = analyze_pcap(file_path)
+        ssl_key_file = os.path.join(ssl_keys_folder, f"{app_name}.log")
+        results[app_name] = analyze_pcap(file_path, ssl_key_file)
 
 
 # ✅ A. IP Header Fields - כולל פרוטוקולים של UDP
