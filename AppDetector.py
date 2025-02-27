@@ -1,15 +1,17 @@
-import pandas as pd
 import os
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.cluster import KMeans
+from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
+import matplotlib
+matplotlib.use('TkAgg')
 
-# 📂 נתיב לתיקיית ה-CSV
-csv_folder = './csv-files/'
+# 📂 קריאת קובצי ה-CSV
+csv_folder = './csv-files/'  # שנה לפי הנתיב שלך
 
-# 🔍 קריאת כל קובצי ה-CSV
+# 🔍 קריאת כל קובצי התעבורה
 results = {}
 for file in os.listdir(csv_folder):
     if file.endswith('.csv'):
@@ -17,81 +19,66 @@ for file in os.listdir(csv_folder):
         app_name = os.path.splitext(file)[0]
         df = pd.read_csv(file_path)
 
+        # שינוי שמות העמודות
+        df.rename(columns={'Time': 'Timestamp', 'Length': 'Packet Size'}, inplace=True)
+
+        # המרת Timestamp למספרים
+        df['Timestamp'] = pd.to_numeric(df['Timestamp'], errors='coerce')
+
         # ניקוי נתונים חסרים
         df = df.dropna(subset=['Packet Size', 'Timestamp'])
-
         results[app_name] = df
 
-# 🎨 צבעים ייחודיים לכל אפליקציה
-colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
-
 # ✅ חישוב מאפיינים סטטיסטיים לכל אפליקציה
-features = {}
+features = []
+app_names = []
 for app, df in results.items():
     packet_sizes = df['Packet Size']
     intervals = df['Timestamp'].diff().dropna()
 
-    features[app] = {
-        'avg_packet_size': packet_sizes.mean(),
-        'std_packet_size': packet_sizes.std(),
-        'avg_interval': intervals.mean(),
-        'std_interval': intervals.std(),
-        'num_packets': len(packet_sizes),
-        'flow_entropy': -sum((packet_sizes.value_counts() / len(packet_sizes)) * np.log2(
+    feature_vector = [
+        packet_sizes.mean(),
+        packet_sizes.std(),
+        intervals.mean(),
+        intervals.std(),
+        len(packet_sizes),
+        -sum((packet_sizes.value_counts() / len(packet_sizes)) * np.log2(
             packet_sizes.value_counts() / len(packet_sizes)))
-    }
+    ]
 
-# יצירת DataFrame מהמאפיינים
-feature_df = pd.DataFrame(features).T
+    features.append(feature_vector)
+    app_names.append(app)
 
-#  הצגת מאפיינים בטבלה
-print("Network Traffic Features:")
-print(feature_df.head())  # מדפיס את חמש השורות הראשונות
+# יצירת DataFrame של המאפיינים
+feature_columns = ['avg_packet_size', 'std_packet_size', 'avg_interval', 'std_interval', 'num_packets', 'flow_entropy']
+feature_df = pd.DataFrame(features, columns=feature_columns)
 
-# ✅ ניתוח אשכולות (Clustering) לזיהוי אפליקציות
+# ✅ נורמליזציה של הנתונים
 scaler = StandardScaler()
-X = scaler.fit_transform(feature_df)
-kmeans = KMeans(n_clusters=len(results), random_state=42, n_init=10)
-clusters = kmeans.fit_predict(X)
-feature_df['Cluster'] = clusters
+X_scaled = scaler.fit_transform(feature_df)
 
-# 📈 גרף להצגת חלוקת האפליקציות לפי אשכולות
+# 📌 שימוש ב-Gaussian Mixture Model (GMM) לזיהוי סוגי תעבורה
+num_clusters = 4  # נגדיר ידנית, אבל אפשר לחפש את המספר הטוב ביותר עם AIC/BIC
+gmm = GaussianMixture(n_components=num_clusters, random_state=42)
+gmm_labels = gmm.fit_predict(X_scaled)
+
+# ✅ הוספת התוויות לטבלה
+feature_df['Predicted Category'] = gmm_labels
+
+# 📊 הצגת התוצאות
+print("\n📊 זיהוי אוטומטי של סוגי תעבורה:")
+print(feature_df)
+
+# ✅ הדפסת ההתאמה בין אפליקציות לקטגוריות
+for app, cluster in zip(app_names, gmm_labels):
+    print(f"📡 {app} → Cluster {cluster}")
+
+# 📈 הצגת הגרף של הקבוצות שנמצאו
 plt.figure(figsize=(10, 6))
-sns.scatterplot(x=feature_df['avg_packet_size'], y=feature_df['avg_interval'], hue=clusters, palette='viridis', s=100)
+sns.scatterplot(x=feature_df['avg_packet_size'], y=feature_df['avg_interval'], hue=gmm_labels, palette='viridis', s=100)
 plt.xlabel("Avg Packet Size")
 plt.ylabel("Avg Inter-Arrival Time")
-plt.title("Clustering of Applications Based on Traffic Features")
-plt.legend(title="Cluster")
+plt.title("Automatic Traffic Classification using GMM")
+plt.legend(title="Predicted Cluster")
 plt.grid(True)
 plt.show()
-
-
-# ✅ יצירת גרפים להשוואת תבניות
-def plot_packet_size_distribution():
-    plt.figure(figsize=(14, 7))
-    for idx, (app, df) in enumerate(results.items()):
-        sns.histplot(df['Packet Size'], bins=50, kde=True, label=app, color=colors[idx % len(colors)], alpha=0.6)
-    plt.title("Packet Size Distribution by App")
-    plt.xlabel("Packet Size (Bytes)")
-    plt.ylabel("Frequency")
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.show()
-
-
-def plot_packet_inter_arrival():
-    plt.figure(figsize=(14, 7))
-    for idx, (app, df) in enumerate(results.items()):
-        intervals = df['Timestamp'].diff().dropna()
-        sns.kdeplot(intervals, label=app, fill=True, color=colors[idx % len(colors)])
-    plt.title("Packet Inter-Arrival Time Distribution by App")
-    plt.xlabel("Inter-arrival Time (s)")
-    plt.ylabel("Density")
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.show()
-
-
-# 📊 הפעלת כל הגרפים
-plot_packet_size_distribution()
-plot_packet_inter_arrival()
