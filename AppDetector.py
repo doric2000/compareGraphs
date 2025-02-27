@@ -7,7 +7,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
 # 📂 נתיב לתיקיית ה-CSV
-csv_folder = './csv_files/'
+csv_folder = './csv-files/'
 
 # 🔍 קריאת כל קובצי ה-CSV
 results = {}
@@ -37,15 +37,16 @@ for app, df in results.items():
         'avg_interval': intervals.mean(),
         'std_interval': intervals.std(),
         'num_packets': len(packet_sizes),
-        'flow_entropy': -sum((packet_sizes.value_counts() / len(packet_sizes)) * np.log2(packet_sizes.value_counts() / len(packet_sizes)))
+        'flow_entropy': -sum((packet_sizes.value_counts() / len(packet_sizes)) * np.log2(
+            packet_sizes.value_counts() / len(packet_sizes)))
     }
 
 # יצירת DataFrame מהמאפיינים
 feature_df = pd.DataFrame(features).T
 
-# 📊 הצגת מאפיינים בטבלה
-import ace_tools as tools
-tools.display_dataframe_to_user(name="Network Traffic Features", dataframe=feature_df)
+#  הצגת מאפיינים בטבלה
+print("Network Traffic Features:")
+print(feature_df.head())  # מדפיס את חמש השורות הראשונות
 
 # ✅ ניתוח אשכולות (Clustering) לזיהוי אפליקציות
 scaler = StandardScaler()
@@ -64,6 +65,7 @@ plt.legend(title="Cluster")
 plt.grid(True)
 plt.show()
 
+
 # ✅ יצירת גרפים להשוואת תבניות
 def plot_packet_size_distribution():
     plt.figure(figsize=(14, 7))
@@ -76,6 +78,7 @@ def plot_packet_size_distribution():
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.show()
 
+
 def plot_packet_inter_arrival():
     plt.figure(figsize=(14, 7))
     for idx, (app, df) in enumerate(results.items()):
@@ -87,6 +90,7 @@ def plot_packet_inter_arrival():
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.show()
+
 
 # 📊 הפעלת כל הגרפים
 plot_packet_size_distribution()
