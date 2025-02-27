@@ -11,7 +11,7 @@ matplotlib.use('TkAgg')
 # 📂 קריאת קובצי ה-CSV
 csv_folder = './csv-files/'  # שנה לפי הנתיב שלך
 
-# 🔍 קריאת כל קובצי התעבורה
+#  קריאת כל קובצי התעבורה
 results = {}
 for file in os.listdir(csv_folder):
     if file.endswith('.csv'):
@@ -29,7 +29,7 @@ for file in os.listdir(csv_folder):
         df = df.dropna(subset=['Packet Size', 'Timestamp'])
         results[app_name] = df
 
-# ✅ חישוב מאפיינים סטטיסטיים לכל אפליקציה
+#  חישוב מאפיינים סטטיסטיים לכל אפליקציה
 features = []
 app_names = []
 for app, df in results.items():
@@ -62,18 +62,18 @@ num_clusters = 4  # נגדיר ידנית, אבל אפשר לחפש את המס�
 gmm = GaussianMixture(n_components=num_clusters, random_state=42)
 gmm_labels = gmm.fit_predict(X_scaled)
 
-# ✅ הוספת התוויות לטבלה
+#  הוספת התוויות לטבלה
 feature_df['Predicted Category'] = gmm_labels
 
-# 📊 הצגת התוצאות
-print("\n📊 זיהוי אוטומטי של סוגי תעבורה:")
+#  הצגת התוצאות
+print("\n Automatically identification of the transfer data:")
 print(feature_df)
 
-# ✅ הדפסת ההתאמה בין אפליקציות לקטגוריות
+#  הדפסת ההתאמה בין אפליקציות לקטגוריות
 for app, cluster in zip(app_names, gmm_labels):
     print(f"📡 {app} → Cluster {cluster}")
 
-# 📈 הצגת הגרף של הקבוצות שנמצאו
+#  הצגת הגרף של הקבוצות שנמצאו
 plt.figure(figsize=(10, 6))
 sns.scatterplot(x=feature_df['avg_packet_size'], y=feature_df['avg_interval'], hue=gmm_labels, palette='viridis', s=100)
 plt.xlabel("Avg Packet Size")
