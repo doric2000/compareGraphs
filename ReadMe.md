@@ -38,7 +38,7 @@ This script extracts key features from network traffic captured in PCAP files. I
 
 ---
 
-### `stream_type_detector.py` (Stream Type Detection)
+### `stream_type_detector.py` && `stream_type_limited_detector.py` (Stream Type Detection)
 **Purpose:** 
 This script **classifies network traffic** into different streaming categories (Audio Streaming, Video Streaming, Web Surfing). It uses clustering and rule-based classification to detect streaming types.
 
@@ -57,11 +57,20 @@ This script **classifies network traffic** into different streaming categories (
   - Must contain the following columns:
     - `No.` (Packet number)
     - `Time` (Timestamp of packet capture)
+    - `Length` (Size of the packet in bytes)
+
+	
+#### **File Structure Requirements for `stream_type_limited_detector.py`**
+- **Input CSV files:** Located in `csv-files/`.
+  - Must contain the following columns:
+    - `No.` (Packet number)
+    - `Time` (Timestamp of packet capture)
     - `Source` (Source IP Address)
     - `Destination` (Destination IP Address)
     - `Protocol` (e.g., TCP, UDP, TLS)
     - `Length` (Size of the packet in bytes)
-    - `Info` (Additional packet details)
+
+	
 
   - Example files:
     - `Audio-Streaming.csv`
