@@ -1,42 +1,91 @@
-# AppDetector: Single-Run Network Traffic Classifier
+# Network Traffic Analysis Project
 
-This repository contains a Python script (**AppDetector.py**) that demonstrates:
-1. Loading multiple CSV files from a specified folder (`./csv-files` by default).
-2. Extracting numerical features (e.g., average packet size, intervals, burstiness).
-3. Assigning an initial classification to each CSV (Video Streaming, Audio Streaming, etc.) via simple threshold rules.
-4. Training a Random Forest model to verify or refine the classification.
-5. Displaying a single scatter plot with color-coded classes.
+This project provides tools for analyzing network traffic using PCAP files and detecting streaming types.
 
-## How It Works
+## Project Structure
 
-1. **Load CSVs**  
-   Each CSV is assumed to contain columns like `Time` (or `Timestamp`) and `Length` (or `Packet Size`). The script renames them if needed and drops incomplete rows.
+### `pcap_feature_extractor.py` (PCAP Feature Extraction)
+**Purpose:** 
+This script extracts key features from network traffic captured in PCAP files. It calculates statistical metrics for packet flows to analyze network behavior.
 
-2. **Extract Features**  
-   For each CSV, the script calculates:
-   - `avg_packet_size`: Mean packet size in bytes
-   - `std_packet_size`: Standard deviation of packet sizes
-   - `avg_interval`: Mean time between consecutive packets
-   - `std_interval`: Standard deviation of those intervals
-   - `num_packets`: Total packet count
-   - `flow_entropy`: Entropy of packet sizes
-   - `flow_duration`: Duration (max-min timestamp)
-   - `burstiness`: The ratio `std_interval / avg_interval`
+**What it does:**
+- Loads **PCAP** files from the `pcapfiles/` directory.
+- Extracts network flow characteristics such as:
+  - **Packet sizes** (mean, standard deviation)
+  - **Inter-arrival times** (mean, standard deviation)
+  - **Total packets per flow**
+  - **Flow entropy** (a measure of randomness in packet sizes)
+- Saves the extracted data in a structured **CSV file** (`flow_analysis_results.csv`).
 
-3. **Classify Traffic (Rule-Based)**  
-   A basic function `classify_traffic` uses threshold conditions to label each CSV as `"Video Streaming"`, `"Video Calls"`, `"Audio Streaming"`, or `"Web Browsing"`.
+**What it shows:**
+- **Summary of extracted network features**
+- **Saved output file (`flow_analysis_results.csv`)** containing analyzed results.
 
-4. **Train Model**  
-   The script uses `RandomForestClassifier` from scikit-learn. It:
-   - Removes categories with <2 samples (avoid classification issues).
-   - Splits data (70% train / 30% test).
-   - Trains the model and prints metrics (optionally).
+#### **File Structure Requirements for `pcap_feature_extractor.py`**
+- **PCAP files directory:** `./pcapfiles/`
+  - Should contain `.pcap` or `.pcapng` files such as:
+    - `Audio-Streaming.pcapng`
+    - `Video-Streaming.pcapng`
+    - `Web-Surfing-1.pcapng`
+- **CSV Output File:** `flow_analysis_results.csv`
+  - Extracted features will be saved with columns:
+    - `Mean Size`
+    - `Std Size`
+    - `Mean Inter-Arrival`
+    - `Std Inter-Arrival`
+    - `Total Packets`
+    - `Flow Entropy`
 
-5. **Visualize**  
-   Finally, it plots a single scatter plot (`avg_packet_size` vs. `avg_interval`), coloring each CSV by its final classification label.
+---
 
-## Usage
+### `stream_type_detector.py` (Stream Type Detection)
+**Purpose:** 
+This script **classifies network traffic** into different streaming categories (Audio Streaming, Video Streaming, Web Surfing). It uses clustering and rule-based classification to detect streaming types.
 
-1. **Install Requirements**  
-   ```bash
-   pip install -r requirements.txt
+**What it does:**
+- Loads extracted feature data from CSV files.
+- Uses **K-Means Clustering** to group traffic flows based on statistical characteristics.
+- Applies **classification logic** to assign a category to each flow.
+- Identifies the most probable application type based on observed network behavior.
+
+**What it shows:**
+- **Clustered traffic categories (Audio, Video, Web Surfing)**
+- **Classification results in a structured output CSV file**
+
+#### **File Structure Requirements for `stream_type_detector.py`**
+- **Input CSV files:** Located in `csv-files/`.
+  - Must contain the following columns:
+    - `No.` (Packet number)
+    - `Time` (Timestamp of packet capture)
+    - `Source` (Source IP Address)
+    - `Destination` (Destination IP Address)
+    - `Protocol` (e.g., TCP, UDP, TLS)
+    - `Length` (Size of the packet in bytes)
+    - `Info` (Additional packet details)
+
+  - Example files:
+    - `Audio-Streaming.csv`
+    - `Video-Conferencing.csv`
+    - `Video-Streaming.csv`
+    - `web-surfing-1.csv`
+    - `Web-Surfing-2.csv`
+
+- **PCAP files:** Used for matching against known traffic patterns.
+
+---
+
+## Installation
+To install required dependencies, run:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Dependencies
+This project requires the following Python libraries:
+- **PyShark** (for PCAP analysis)
+- **Pandas** (for data processing)
+- **NumPy** (for numerical computations)
+- **Seaborn, Matplotlib** (for visualization)
+- **SciPy** (for entropy calculations)
+- **Scikit-learn** (for clustering and classification)
