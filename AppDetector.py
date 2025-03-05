@@ -7,7 +7,7 @@ This script demonstrates how to:
 2) Extract key numerical features (average packet size, intervals, burstiness, etc.).
 3) Apply a basic rule-based classification to assign each CSV a 'Traffic_Type'.
 4) Train and evaluate a Random Forest classifier based on these features.
-5) Display a single scatter plot of (avg_packet_size vs avg_interval) with color-coded classes.
+5) Display a scatter plot of (avg_packet_size vs avg_interval) with color-coded classes.
 
 HOW TO RUN:
     python AppDetector.py
@@ -16,7 +16,11 @@ ASSUMPTIONS:
     - Each CSV has 'Time' or 'Timestamp' for timestamps,
       and 'Length' or 'Packet Size' for packet sizes.
     - The user placed these CSVs in a subfolder called './csv-files'.
-    - This is a single-run script (not iterating 100 times).
+    - This version limits analysis to what an attacker would know based on:
+      * Packet size
+      * Timestamps
+      * Inter-arrival time (computed)
+      * Burstiness (computed from intervals)
 """
 
 import os
@@ -33,16 +37,11 @@ import matplotlib
 # Set TkAgg as the backend to display plots in certain environments (especially in PyCharm)
 matplotlib.use('TkAgg')
 
-
 # Function to load CSV files from a specified directory
 def load_csv_files(csv_folder):
     """
     Loads all CSV files from the specified folder.
     It renames columns for consistency and cleans missing values.
-
-    Returns:
-        A dictionary where the key is the application name,
-        and the value is a DataFrame containing the network traffic data.
     """
     results = {}
     for file in os.listdir(csv_folder):
@@ -61,18 +60,13 @@ def load_csv_files(csv_folder):
             results[app_name] = df
     return results
 
-
 # Function to extract relevant features from network traffic data
 def extract_features(results):
     """
     Extracts statistical features from each traffic flow, including:
     - Average and standard deviation of packet sizes
     - Inter-packet time intervals
-    - Burstiness and entropy measures
-    - Flow duration, number of packets, and data rate
-
-    Returns:
-        A DataFrame with the extracted features for each application.
+    - Burstiness
     """
     feature_list, app_names = [], []
     for app, df in results.items():
@@ -90,29 +84,16 @@ def extract_features(results):
         std_int = intervals.std() if len(intervals) > 0 else 0.0
 
         burstiness = std_int / avg_int if avg_int != 0 else 0.0  # Measures traffic burstiness
-        probs = packet_sizes.value_counts(normalize=True, dropna=True)
-        flow_entropy = -np.sum(probs * np.log2(probs)) if not probs.empty else 0
 
-        flow_duration = df['Timestamp'].max() - df['Timestamp'].min() if len(df) > 0 else 0.0
-        num_packets = len(packet_sizes)
-        data_rate = packet_sizes.sum() / flow_duration if flow_duration > 0 else 0.0
-
-        outgoing_packets = df[df['Packet Size'] > avg_pkt]['Packet Size'].count()
-        incoming_packets = df[df['Packet Size'] <= avg_pkt]['Packet Size'].count()
-        pkt_ratio = outgoing_packets / incoming_packets if incoming_packets > 0 else 0.0
-
-        feature_vector = [avg_pkt, std_pkt, max_pkt, avg_int, std_int, burstiness,
-                          flow_entropy, flow_duration, num_packets, data_rate, pkt_ratio]
+        feature_vector = [avg_pkt, std_pkt, max_pkt, min_pkt, avg_int, std_int, burstiness]
         feature_list.append(feature_vector)
         app_names.append(app)
 
     # Define feature column names
-    feature_columns = ['avg_packet_size', 'std_packet_size', 'max_packet_size',
-                       'avg_interval', 'std_interval', 'burstiness', 'flow_entropy', 'flow_duration',
-                       'num_packets', 'data_rate', 'packet_ratio']
+    feature_columns = ['avg_packet_size', 'std_packet_size', 'max_packet_size', 'min_packet_size',
+                       'avg_interval', 'std_interval', 'burstiness']
 
     return pd.DataFrame(feature_list, columns=feature_columns, index=app_names)
-
 
 # Rule-based classification function
 def classify_traffic(feature_df):
@@ -120,11 +101,7 @@ def classify_traffic(feature_df):
     Classifies traffic using basic rule-based logic based on:
     - Packet size
     - Inter-arrival time
-
-    Returns:
-        DataFrame with an additional "Traffic_Type" column indicating the classified traffic.
     """
-
     def classify_row(row):
         avg_pkt = row['avg_packet_size']
         avg_int = row['avg_interval']
@@ -140,15 +117,10 @@ def classify_traffic(feature_df):
     feature_df['Traffic_Type'] = feature_df.apply(classify_row, axis=1)
     return feature_df
 
-
 # Function to train a Random Forest model for classification
 def train_model(feature_df):
     """
     Trains a Random Forest model to classify network traffic automatically.
-    It ensures that each category has at least two examples before splitting the data.
-
-    Returns:
-        The trained model, scaler, and train-test split data.
     """
     if 'Traffic_Type' not in feature_df.columns:
         raise ValueError("Missing 'Traffic_Type' column; run classify_traffic first.")
@@ -164,10 +136,11 @@ def train_model(feature_df):
 
     # Normalize the features
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    X_scaled = scaler.fit_transform(feature_df.drop(columns=['Traffic_Type']))
+    y = feature_df['Traffic_Type']
 
     # Ensure all categories appear in both training and test sets
-    if len(valid_classes) > 1:
+    if len(y.unique()) > 1:
         X_train, X_test, y_train, y_test = train_test_split(
             X_scaled, y, test_size=0.2, stratify=y, random_state=42
         )
@@ -183,12 +156,10 @@ def train_model(feature_df):
 
     return rf_model, scaler, X_train, X_test, y_train, y_test, y_pred
 
-
 # Function to visualize classification results
 def visualize_traffic(feature_df):
     """
     Generates a scatter plot of average packet size vs. average inter-arrival time.
-    The points are color-coded based on classified traffic type.
     """
     plt.figure(figsize=(10, 6))
     sns.scatterplot(
@@ -198,13 +169,12 @@ def visualize_traffic(feature_df):
         hue='Traffic_Type',
         s=100
     )
-    plt.title("Traffic Classification - Enhanced Version")
+    plt.title("Traffic Classification - Updated for Attacker Model")
     plt.xlabel("Avg Packet Size (bytes)")
     plt.ylabel("Avg Inter-Arrival Time (s)")
     plt.legend(title="Traffic Type", bbox_to_anchor=(1.02, 1), loc='upper left')
     plt.tight_layout()
     plt.show()
-
 
 if __name__ == "__main__":
     pd.set_option('display.max_columns', None)
