@@ -57,20 +57,18 @@ This script **classifies network traffic** into different streaming categories (
   - Must contain the following columns:
     - `No.` (Packet number)
     - `Time` (Timestamp of packet capture)
+    - `Source` (Source IP Address)
+    - `Destination` (Destination IP Address)
+    - `Protocol` (e.g., TCP, UDP, TLS)
     - `Length` (Size of the packet in bytes)
-
 	
 #### **File Structure Requirements for `stream_type_limited_detector.py`**
 - **Input CSV files:** Located in `csv-files/`.
   - Must contain the following columns:
     - `No.` (Packet number)
     - `Time` (Timestamp of packet capture)
-    - `Source` (Source IP Address)
-    - `Destination` (Destination IP Address)
-    - `Protocol` (e.g., TCP, UDP, TLS)
     - `Length` (Size of the packet in bytes)
 
-	
 
   - Example files:
     - `Audio-Streaming.csv`
