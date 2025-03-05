@@ -1,3 +1,28 @@
+"""
+Network Traffic Analysis Script
+---------------------------------
+This script is designed to:
+
+1) Load multiple PCAP files, each representing network traffic data.
+2) Extract key numerical features such as packet sizes, timestamps, and transport protocols.
+3) Apply a rule-based approach to analyze IP, TCP, and TLS traffic.
+4) Compute additional network metrics such as inter-arrival times.
+5) Store the results in structured Pandas DataFrames for further analysis.
+6) Generate visualizations to understand protocol distribution, packet sizes, and inter-arrival time distributions.
+
+HOW TO RUN:
+    Execute the script using Python:
+    python network_traffic_analysis.py
+
+ASSUMPTIONS:
+- Each PCAP file contains network traffic data that includes IP, TCP, and TLS packets.
+- SSL key log files (if available) are stored in a designated folder for decryption.
+- The script extracts only non-encrypted metadata from TLS packets.
+- The extracted data is structured into tables to facilitate further analysis.
+- The script processes multiple files and visualizes network characteristics.
+"""
+
+
 import matplotlib
 import pyshark
 import pandas as pd
@@ -5,7 +30,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import numpy as np
-from matplotlib.ticker import ScalarFormatter
+
 
 matplotlib.use('TkAgg')
 
