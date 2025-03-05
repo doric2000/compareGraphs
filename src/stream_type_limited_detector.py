@@ -135,7 +135,7 @@ def train_model(feature_df):
     y = feature_df['Traffic_Type']
 
     # Ensure all categories appear in both training and test sets
-    if len(y.unique()) > 1:
+    if len(y.unique()) > 2:
         X_train, X_test, y_train, y_test = train_test_split(
             X_scaled, y, test_size=0.2, stratify=y, random_state=42
         )

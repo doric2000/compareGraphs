@@ -78,19 +78,18 @@ def extract_features(results):
         avg_pkt = packet_sizes.mean()
         std_pkt = packet_sizes.std()
         max_pkt = packet_sizes.max()
-        min_pkt = packet_sizes.min()
 
         avg_int = intervals.mean() if len(intervals) > 0 else 0.0
         std_int = intervals.std() if len(intervals) > 0 else 0.0
 
         burstiness = std_int / avg_int if avg_int != 0 else 0.0  # Measures traffic burstiness
 
-        feature_vector = [avg_pkt, std_pkt, max_pkt, min_pkt, avg_int, std_int, burstiness]
+        feature_vector = [avg_pkt, std_pkt, max_pkt, avg_int, std_int, burstiness]
         feature_list.append(feature_vector)
         app_names.append(app)
 
     # Define feature column names
-    feature_columns = ['avg_packet_size', 'std_packet_size', 'max_packet_size', 'min_packet_size',
+    feature_columns = ['avg_packet_size', 'std_packet_size', 'max_packet_size',
                        'avg_interval', 'std_interval', 'burstiness']
 
     return pd.DataFrame(feature_list, columns=feature_columns, index=app_names)
@@ -140,7 +139,7 @@ def train_model(feature_df):
     y = feature_df['Traffic_Type']
 
     # Ensure all categories appear in both training and test sets
-    if len(y.unique()) > 1:
+    if len(y.unique()) > 2:
         X_train, X_test, y_train, y_test = train_test_split(
             X_scaled, y, test_size=0.2, stratify=y, random_state=42
         )
