@@ -174,7 +174,7 @@ def visualize_traffic(feature_df):
 if __name__ == "__main__":
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', 1000)
-    csv_folder = "../res/csv_decrypted"
+    csv_folder = "../res/csv-files-encrypted"
 
     results = load_csv_files(csv_folder)
     if not results:
