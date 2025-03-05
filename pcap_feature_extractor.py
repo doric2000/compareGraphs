@@ -22,6 +22,7 @@ ASSUMPTIONS:
 - The script processes multiple files and visualizes network characteristics.
 """
 
+
 import matplotlib
 import pyshark
 import pandas as pd
@@ -29,17 +30,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import numpy as np
+from matplotlib.ticker import ScalarFormatter
 
-# Set the backend for Matplotlib to avoid GUI errors
 matplotlib.use('TkAgg')
 
-# Define the paths for the PCAP files and SSL keys
-pcap_folder = './pcapfiles/'  # Directory containing PCAP files
-ssl_keys_folder = './sslkeys/'  # Directory containing SSL Key Log files
+# 📂 נתיב לקבצים
+pcap_folder = './pcapfiles/'
+ssl_keys_folder = './sslkeys/'  # 🔑 תיקייה לקובצי SSL Key Log
 
-# Dictionary to store the processed results
+# שמירת התוצאות
 results = {}
 
+# 🎨 צבעים ייחודיים לכל אפליקציה
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
 
 # 🔍 פונקציה לניתוח קובץ PCAP עם קובץ SSL
@@ -147,7 +149,6 @@ def analyze_pcap(file_path, ssl_key_path=None):
             'Interval': packet_intervals
         })
     }
-
 
 # 🔍 עיבוד כל הקבצים בתיקיה
 for idx, file in enumerate(os.listdir(pcap_folder)):
