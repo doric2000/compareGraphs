@@ -1,5 +1,5 @@
 """
-AppDetector.py
+stream_type_detector.py
 --------------
 This script demonstrates how to:
 
@@ -10,7 +10,7 @@ This script demonstrates how to:
 5) Display a scatter plot of (avg_packet_size vs avg_interval) with color-coded classes.
 
 HOW TO RUN:
-    python AppDetector.py
+    python stream_type_detector.py
 
 ASSUMPTIONS:
     - Each CSV has 'Time' or 'Timestamp' for timestamps,
