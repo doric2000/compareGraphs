@@ -1,16 +1,25 @@
-
 # Network Traffic Analysis Project
 
 This project provides tools for analyzing network traffic using PCAP files and detecting streaming types.
 
 ## Project Structure
 
-### `pcap_feature_extractor.py`
-This script extracts traffic features from PCAP files, such as:
-- **Packet size statistics** (mean, standard deviation)
-- **Packet inter-arrival times** (mean, standard deviation)
-- **Total number of packets per flow**
-- **Flow entropy** (measures randomness in packet sizes)
+### `pcap_feature_extractor.py` (PCAP Feature Extraction)
+**Purpose:** 
+This script extracts key features from network traffic captured in PCAP files. It calculates statistical metrics for packet flows to analyze network behavior.
+
+**What it does:**
+- Loads **PCAP** files from the `pcapfiles/` directory.
+- Extracts network flow characteristics such as:
+  - **Packet sizes** (mean, standard deviation)
+  - **Inter-arrival times** (mean, standard deviation)
+  - **Total packets per flow**
+  - **Flow entropy** (a measure of randomness in packet sizes)
+- Saves the extracted data in a structured **CSV file** (`flow_analysis_results.csv`).
+
+**What it shows:**
+- **Summary of extracted network features**
+- **Saved output file (`flow_analysis_results.csv`)** containing analyzed results.
 
 #### **File Structure Requirements for `pcap_feature_extractor.py`**
 - **PCAP files directory:** `./pcapfiles/`
@@ -29,11 +38,19 @@ This script extracts traffic features from PCAP files, such as:
 
 ---
 
-### `stream_type_detector.py`
-This script detects different types of streaming (Audio, Video, Web Surfing) from the extracted network features.
-It uses clustering techniques such as:
-- **K-Means clustering** to group similar network flows.
-- **Decision rules** to classify traffic into predefined categories.
+### `stream_type_detector.py` (Stream Type Detection)
+**Purpose:** 
+This script **classifies network traffic** into different streaming categories (Audio Streaming, Video Streaming, Web Surfing). It uses clustering and rule-based classification to detect streaming types.
+
+**What it does:**
+- Loads extracted feature data from CSV files.
+- Uses **K-Means Clustering** to group traffic flows based on statistical characteristics.
+- Applies **classification logic** to assign a category to each flow.
+- Identifies the most probable application type based on observed network behavior.
+
+**What it shows:**
+- **Clustered traffic categories (Audio, Video, Web Surfing)**
+- **Classification results in a structured output CSV file**
 
 #### **File Structure Requirements for `stream_type_detector.py`**
 - **Input CSV files:** Located in `csv-files/`.
@@ -66,9 +83,9 @@ pip install -r requirements.txt
 
 ## Dependencies
 This project requires the following Python libraries:
-- PyShark (for PCAP analysis)
-- Pandas (for data processing)
-- NumPy (for numerical computations)
-- Seaborn, Matplotlib (for visualization)
-- SciPy (for entropy calculations)
-- Scikit-learn (for clustering and classification)
+- **PyShark** (for PCAP analysis)
+- **Pandas** (for data processing)
+- **NumPy** (for numerical computations)
+- **Seaborn, Matplotlib** (for visualization)
+- **SciPy** (for entropy calculations)
+- **Scikit-learn** (for clustering and classification)
