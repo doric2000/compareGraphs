@@ -34,17 +34,17 @@ from matplotlib.ticker import ScalarFormatter
 
 matplotlib.use('TkAgg')
 
-# 📂 נתיב לקבצים
-pcap_folder = './pcapfiles/'
-ssl_keys_folder = './sslkeys/'  # 🔑 תיקייה לקובצי SSL Key Log
+# Path to files
+pcap_folder = '../res/pcapfiles/'
+ssl_keys_folder = '../res/sslkeys/'
 
-# שמירת התוצאות
+# Storing results
 results = {}
 
-# 🎨 צבעים ייחודיים לכל אפליקציה
+# Unique colors for each application
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
 
-# 🔍 פונקציה לניתוח קובץ PCAP עם קובץ SSL
+# Function to analyze PCAP file with SSL key
 
 for idx, file in enumerate(os.listdir(pcap_folder)):
     if file.endswith('.pcap') or file.endswith('.pcapng'):
@@ -58,6 +58,27 @@ for idx, file in enumerate(os.listdir(pcap_folder)):
             print(f"⚠️ No SSL Key Log found for {app_name}, running without decryption.")
 
 
+
+
+"""
+    Analyzes a PCAP file and extracts key network traffic features.
+
+This function processes a PCAP file, extracting metadata from IP, TCP, and TLS layers. 
+If an SSL key log is available, it enables TLS decryption.
+
+**Extracted Features:**
+- **IP Layer:** Source/Destination IP, Protocol, Transport, Packet size, Timestamp.
+- **TCP Layer:** Source/Destination port, TCP flags.
+- **TLS Layer:** Version, Cipher suite, Handshake type, Server Name Indication (SNI).
+- **Timing Metrics:** Inter-packet arrival time.
+
+**Parameters:**
+- `file_path` (str): Path to the PCAP file.
+- `ssl_key_path` (str, optional): Path to the SSL key log file.
+
+**Returns:**
+- dict: A dictionary of Pandas DataFrames for IP, TCP, TLS, and inter-arrival time data.
+"""
 def analyze_pcap(file_path, ssl_key_path=None):
     capture_options = {}
     if ssl_key_path and os.path.exists(ssl_key_path):
@@ -82,7 +103,7 @@ def analyze_pcap(file_path, ssl_key_path=None):
     tls_sni = []
 
     for packet in cap:
-        # A. IP Header Fields
+        # A. Extract IP Header Fields
         if 'ip' in packet:
             ip_src.append(packet.ip.src)
             ip_dst.append(packet.ip.dst)
@@ -98,7 +119,7 @@ def analyze_pcap(file_path, ssl_key_path=None):
             packet_sizes.append(None)
             packet_timestamps.append(None)
 
-        # B. TCP Header Fields
+        # B. Extract TCP Header Fields
         if 'tcp' in packet:
             tcp_src_ports.append(packet.tcp.srcport)
             tcp_dst_ports.append(packet.tcp.dstport)
@@ -108,7 +129,7 @@ def analyze_pcap(file_path, ssl_key_path=None):
             tcp_dst_ports.append(None)
             tcp_flags.append(None)
 
-        # C. TLS Fields
+        # C. Extract TLS Handshake Fields
         if 'tls' in packet:
             tls_handshake_types.append(getattr(packet.tls, 'handshake_type', None))
             tls_versions.append(getattr(packet.tls, 'record_version', None))
@@ -122,7 +143,7 @@ def analyze_pcap(file_path, ssl_key_path=None):
 
     cap.close()
 
-    # חישוב מרווחי זמן בין פקטות
+    # Compute inter-packet arrival times (time difference between consecutive packets)
     packet_intervals = np.diff([t for t in packet_timestamps if t is not None])
 
     return {
@@ -150,7 +171,8 @@ def analyze_pcap(file_path, ssl_key_path=None):
         })
     }
 
-# 🔍 עיבוד כל הקבצים בתיקיה
+
+# Process all PCAP files in the specified folder
 for idx, file in enumerate(os.listdir(pcap_folder)):
     if file.endswith('.pcap') or file.endswith('.pcapng'):
         app_name = file.split('.')[0]
@@ -159,7 +181,20 @@ for idx, file in enumerate(os.listdir(pcap_folder)):
         results[app_name] = analyze_pcap(file_path, ssl_key_file)
 
 
-# ✅ A. IP Header Fields - כולל פרוטוקולים של UDP
+"""
+    lots the distribution of the most used IP and transport layer protocols.
+
+This function analyzes network traffic data, counts occurrences of different IP protocols (TCP, UDP, ICMP), 
+and visualizes the top 10 most frequent protocols in a grouped bar chart.
+
+**Process:**
+1) Extract protocol counts from all analyzed PCAP files.
+2) Identify the top 10 most used protocols.
+3) Generate a bar chart comparing protocol usage across different applications.
+
+**Returns:**
+- A bar chart displaying protocol distribution.
+"""
 def plot_ip_protocol_distribution():
     plt.figure(figsize=(14, 7))
     protocol_counts = {}
@@ -173,21 +208,25 @@ def plot_ip_protocol_distribution():
         for transport, count in transport_count.items():
             protocol_counts[transport] = protocol_counts.get(transport, 0) + count
 
+    # Extract the top 10 most common protocols
     top_protocols = sorted(protocol_counts.items(), key=lambda x: x[1], reverse=True)[:10]
     top_protocols = [p[0] for p in top_protocols]
 
     bar_width = 0.15
     x = np.arange(len(top_protocols))
 
+    # Plot protocol usage per application
     for idx, (app, app_data) in enumerate(results.items()):
         filtered_data = app_data['ip']['Protocol'].value_counts().reindex(top_protocols, fill_value=0)
         transport_data = app_data['ip']['Transport'].value_counts().reindex(top_protocols, fill_value=0)
         final_data = filtered_data.add(transport_data, fill_value=0)
+
         bars = plt.bar(x + idx * bar_width, final_data, width=bar_width, label=app, alpha=0.8)
 
+        # Display count values on top of bars
         for bar in bars:
-            plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), str(int(bar.get_height())), ha='center',
-                     va='bottom', fontsize=8)
+            plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), str(int(bar.get_height())),
+                     ha='center', va='bottom', fontsize=8)
 
     plt.title("A: Most Frequent Protocols by App")
     plt.xlabel("Protocol")
@@ -198,27 +237,45 @@ def plot_ip_protocol_distribution():
     plt.show()
 
 
-# ✅ B. Top 10 TCP Source Ports
+
+#  B. Top 10 TCP Source Ports
+"""
+    Plots the top 10 most frequently used TCP source ports per application.
+
+    This function analyzes TCP traffic from all processed PCAP files, 
+    counts the most common source ports for each application, 
+    and visualizes them in a grouped bar chart.
+
+    **Process:**
+    1) Extract source port counts from all applications.
+    2) Identify the top 10 most used source ports per application.
+    3) Create a unique list of the top ports across all applications.
+    4) Plot a grouped bar chart showing port usage per application.
+
+    **Returns:**
+    - A bar chart displaying TCP source port distribution.
+    """
 def plot_tcp_source_ports():
     plt.figure(figsize=(18, 9))
     port_counts = {}
 
-    # ספירת הפורטים עבור כל אפליקציה
+    # Count source ports for each application
     for app, app_data in results.items():
         ports = app_data['tcp']['Source Port'].dropna()
         port_counts[app] = ports.value_counts().nlargest(10)
 
-    # יצירת רשימה ייחודית של פורטים לכל האפליקציות
+    # Create a unique list of the top ports across all applications
     unique_ports = sorted(set(port for counts in port_counts.values() for port in counts.index))
 
     x = np.arange(len(unique_ports))
     bar_width = 0.15
 
+    # Plot port usage per application
     for idx, (app, counts) in enumerate(port_counts.items()):
         values = [counts.get(port, 0) for port in unique_ports]
         bars = plt.bar(x + idx * bar_width, values, width=bar_width, color=colors[idx % len(colors)], label=app)
 
-        # הצגת המספרים על גבי העמודות עם הטייה כלפי מעלה
+        # Display values on top of bars
         for bar in bars:
             if bar.get_height() > 0:
                 plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 5,
@@ -234,10 +291,21 @@ def plot_tcp_source_ports():
     plt.show()
 
 
-# ✅ C. Packet Inter-arrival Time
-from matplotlib.ticker import MaxNLocator
+"""
+    Plots the packet inter-arrival time distribution for each application.
 
+    This function analyzes the time intervals between consecutive packets 
+    in network traffic for each application and visualizes their distributions using KDE plots.
 
+    **Process:**
+    1) Extract inter-arrival times from all applications.
+    2) Compute the average inter-arrival time for each app.
+    3) Plot a Kernel Density Estimate (KDE) curve for each app.
+    4) Mark the average inter-arrival time on each graph.
+
+    **Returns:**
+    - A set of KDE plots displaying inter-arrival time distributions.
+    """
 def plot_packet_inter_arrival():
     num_apps = len(results)
     cols = 2
@@ -260,12 +328,12 @@ def plot_packet_inter_arrival():
                 label=app
             )
 
-            # חישוב ממוצע והוספתו
-            avg_interval = intervals.mean() * 1000  # ms
+            # Compute and plot the average inter-arrival time
+            avg_interval = intervals.mean() * 1000  # Convert to milliseconds
             ax.axvline(avg_interval / 1000, color='black', linestyle='--', linewidth=2)
 
-            # ✨ מיקום חדש לתווית מעל הגרף
-            y_max = ax.get_ylim()[1] * 1.05  # קביעת מיקום מעל הגרף
+            # Position the label above the graph
+            y_max = ax.get_ylim()[1] * 1.05
             ax.text(avg_interval / 1000, y_max, f"Avg: {avg_interval:.2f} ms",
                     ha='center', va='bottom', fontsize=10, fontweight='bold', color='black',
                     bbox=dict(facecolor='white', alpha=0.8, edgecolor='black'))
@@ -275,14 +343,28 @@ def plot_packet_inter_arrival():
             ax.set_ylabel("Density")
             ax.grid(True, linestyle='--', alpha=0.6, which='both')
 
+    # Remove empty subplots if the number of apps is odd
     for i in range(idx + 1, len(axes)):
         fig.delaxes(axes[i])
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
+"""
+    Plots the packet size distribution for each application.
 
-# ✅ D. Packet Sizes
+    This function analyzes packet size data from network traffic for each application
+    and visualizes the distribution using histograms.
+
+    **Process:**
+    1) Extract packet sizes from all applications.
+    2) Compute the average packet size for each app.
+    3) Plot a histogram showing the packet size distribution.
+    4) Mark the average packet size on each graph.
+
+    **Returns:**
+    - A set of histograms displaying packet size distributions.
+    """
 def plot_packet_size_distribution():
     num_apps = len(results)
     cols = 2
@@ -298,12 +380,12 @@ def plot_packet_size_distribution():
             packet_sizes = app_data['ip']['Packet Size'].dropna()
             ax.hist(packet_sizes, bins=50, alpha=0.6, color=colors[idx % len(colors)], edgecolor='black')
 
-            # חישוב ממוצע והוספתו
+            # Compute and plot the average packet size
             avg_size = packet_sizes.mean()
             ax.axvline(avg_size, color='black', linestyle='--', linewidth=2)
 
-            # ✨ מיקום חדש לתווית הממוצע מעל הגרף
-            y_max = ax.get_ylim()[1] * 1.05  # קביעת מיקום מעל הגרף
+            # Position the label above the graph
+            y_max = ax.get_ylim()[1] * 1.05
             ax.text(avg_size, y_max, f"Avg: {avg_size:.2f} Bytes",
                     ha='center', va='bottom', fontsize=10, fontweight='bold', color='black',
                     bbox=dict(facecolor='white', alpha=0.8, edgecolor='black'))
@@ -313,6 +395,7 @@ def plot_packet_size_distribution():
             ax.set_ylabel("Frequency")
             ax.grid(True, linestyle='--', alpha=0.6, which='both')
 
+    # Remove empty subplots if the number of apps is odd
     for i in range(idx + 1, len(axes)):
         fig.delaxes(axes[i])
 
@@ -320,7 +403,7 @@ def plot_packet_size_distribution():
     plt.show()
 
 
-# 📊 הפעלת כל הגרפים
+#  Execute all visualizations
 plot_ip_protocol_distribution()
 plot_tcp_source_ports()
 plot_packet_inter_arrival()

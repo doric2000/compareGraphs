@@ -1,22 +1,17 @@
 """
-stream_type_detector.py
---------------
-This script demonstrates how to:
-
-1) Load multiple CSV files, each representing network traffic data.
-2) Extract key numerical features (average packet size, intervals, burstiness, etc.).
-3) Apply a basic rule-based classification to assign each CSV a 'Traffic_Type'.
-4) Train and evaluate a Random Forest classifier based on these features.
-5) Display a scatter plot of (avg_packet_size vs avg_interval) with color-coded classes.
+stream_type_limited_detector.py - Adapted to Attacker Model (Packet Size & Timestamp Only)
+----------------------------------------------------------------------
+This script demonstrates how an attacker with limited access to network data
+(packet size and timestamps) can attempt to classify network traffic.
 
 HOW TO RUN:
-    python stream_type_detector.py
+    python AppDetector.py
 
 ASSUMPTIONS:
     - Each CSV has 'Time' or 'Timestamp' for timestamps,
       and 'Length' or 'Packet Size' for packet sizes.
     - The user placed these CSVs in a subfolder called './csv-files'.
-    - This version limits analysis to what an attacker would know based on:
+    - This version only analyzes:
       * Packet size
       * Timestamps
       * Inter-arrival time (computed)
@@ -63,10 +58,10 @@ def load_csv_files(csv_folder):
 # Function to extract relevant features from network traffic data
 def extract_features(results):
     """
-    Extracts statistical features from each traffic flow, including:
+    Extracts statistical features from each traffic flow based on:
     - Average and standard deviation of packet sizes
-    - Inter-packet time intervals
-    - Burstiness
+    - Inter-packet time intervals (computed from timestamps)
+    - Burstiness (computed as std/mean of inter-arrival times)
     """
     feature_list, app_names = [], []
     for app, df in results.items():
@@ -78,19 +73,18 @@ def extract_features(results):
         avg_pkt = packet_sizes.mean()
         std_pkt = packet_sizes.std()
         max_pkt = packet_sizes.max()
-        min_pkt = packet_sizes.min()
 
         avg_int = intervals.mean() if len(intervals) > 0 else 0.0
         std_int = intervals.std() if len(intervals) > 0 else 0.0
 
         burstiness = std_int / avg_int if avg_int != 0 else 0.0  # Measures traffic burstiness
 
-        feature_vector = [avg_pkt, std_pkt, max_pkt, min_pkt, avg_int, std_int, burstiness]
+        feature_vector = [avg_pkt, std_pkt, max_pkt, avg_int, std_int, burstiness]
         feature_list.append(feature_vector)
         app_names.append(app)
 
     # Define feature column names
-    feature_columns = ['avg_packet_size', 'std_packet_size', 'max_packet_size', 'min_packet_size',
+    feature_columns = ['avg_packet_size', 'std_packet_size', 'max_packet_size',
                        'avg_interval', 'std_interval', 'burstiness']
 
     return pd.DataFrame(feature_list, columns=feature_columns, index=app_names)
@@ -121,6 +115,7 @@ def classify_traffic(feature_df):
 def train_model(feature_df):
     """
     Trains a Random Forest model to classify network traffic automatically.
+    Handles cases where a class has fewer than two occurrences to prevent errors.
     """
     if 'Traffic_Type' not in feature_df.columns:
         raise ValueError("Missing 'Traffic_Type' column; run classify_traffic first.")
@@ -169,7 +164,7 @@ def visualize_traffic(feature_df):
         hue='Traffic_Type',
         s=100
     )
-    plt.title("Traffic Classification - Updated for Attacker Model")
+    plt.title("Traffic Classification - Limited to Packet Size & Timestamp")
     plt.xlabel("Avg Packet Size (bytes)")
     plt.ylabel("Avg Inter-Arrival Time (s)")
     plt.legend(title="Traffic Type", bbox_to_anchor=(1.02, 1), loc='upper left')
@@ -179,7 +174,7 @@ def visualize_traffic(feature_df):
 if __name__ == "__main__":
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', 1000)
-    csv_folder = "./csv-files"
+    csv_folder = "../res/csv_decrypted"
 
     results = load_csv_files(csv_folder)
     if not results:
