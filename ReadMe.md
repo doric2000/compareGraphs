@@ -1,3 +1,4 @@
+
 # Network Traffic Analysis Project
 
 This project provides tools for analyzing network traffic using PCAP files and detecting streaming types.
@@ -11,14 +12,20 @@ This script extracts traffic features from PCAP files, such as:
 - **Total number of packets per flow**
 - **Flow entropy** (measures randomness in packet sizes)
 
-It performs the following operations:
-1. Loads network traffic from `.pcap` or `.pcapng` files.
-2. Extracts statistical features from packet data.
-3. Saves the processed data to CSV files.
-
 #### **File Structure Requirements for `pcap_feature_extractor.py`**
 - **PCAP files directory:** `./pcapfiles/`
-- **Output file:** `flow_analysis_results.csv`
+  - Should contain `.pcap` or `.pcapng` files such as:
+    - `Audio-Streaming.pcapng`
+    - `Video-Streaming.pcapng`
+    - `Web-Surfing-1.pcapng`
+- **CSV Output File:** `flow_analysis_results.csv`
+  - Extracted features will be saved with columns:
+    - `Mean Size`
+    - `Std Size`
+    - `Mean Inter-Arrival`
+    - `Std Inter-Arrival`
+    - `Total Packets`
+    - `Flow Entropy`
 
 ---
 
@@ -30,6 +37,22 @@ It uses clustering techniques such as:
 
 #### **File Structure Requirements for `stream_type_detector.py`**
 - **Input CSV files:** Located in `csv-files/`.
+  - Must contain the following columns:
+    - `No.` (Packet number)
+    - `Time` (Timestamp of packet capture)
+    - `Source` (Source IP Address)
+    - `Destination` (Destination IP Address)
+    - `Protocol` (e.g., TCP, UDP, TLS)
+    - `Length` (Size of the packet in bytes)
+    - `Info` (Additional packet details)
+
+  - Example files:
+    - `Audio-Streaming.csv`
+    - `Video-Conferencing.csv`
+    - `Video-Streaming.csv`
+    - `web-surfing-1.csv`
+    - `Web-Surfing-2.csv`
+
 - **PCAP files:** Used for matching against known traffic patterns.
 
 ---
